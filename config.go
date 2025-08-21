@@ -167,13 +167,13 @@ func ParseMask(s string) Mask {
 	}
 
 	switch strings.ToUpper(s) {
-	case MaskNone.String():
+	case MaskNoneStr:
 		return MaskNone
-	case "ESSENTIAL":
+	case MaskEssentialStr:
 		return MaskEssential
-	case "PRODUCTION":
+	case MaskProductionStr:
 		return MaskProduction
-	case "ALL":
+	case MaskAllStr:
 		return MaskAll
 	}
 
@@ -184,37 +184,37 @@ func ParseMask(s string) Mask {
 	for _, flag := range flags {
 		flag = strings.TrimSpace(flag)
 		switch flag {
-		case "COUNTERS":
+		case MaskCountersStr:
 			mask = mask.Add(MaskCounters)
-		case "LATENCY":
+		case MaskLatencyStr:
 			mask = mask.Add(MaskLatency)
-		case "THROUGHPUT":
+		case MaskThroughputStr:
 			mask = mask.Add(MaskThroughput)
-		case "ERRORS":
+		case MaskErrorsStr:
 			mask = mask.Add(MaskErrors)
-		case "RESOURCES":
+		case MaskResourcesStr:
 			mask = mask.Add(MaskResources)
-		case "QUEUES":
+		case MaskQueuesStr:
 			mask = mask.Add(MaskQueues)
-		case "CONNECTIONS":
+		case MaskConnectionsStr:
 			mask = mask.Add(MaskConnections)
-		case "CACHE":
+		case MaskCacheStr:
 			mask = mask.Add(MaskCache)
-		case "CIRCUIT_BREAKER":
+		case MaskCircuitBreakerStr:
 			mask = mask.Add(MaskCircuitBreaker)
-		case "HEALTH":
+		case MaskHealthStr:
 			mask = mask.Add(MaskHealth)
-		case "SECURITY":
+		case MaskSecurityStr:
 			mask = mask.Add(MaskSecurity)
-		case "PERFORMANCE":
+		case MaskPerformanceStr:
 			mask = mask.Add(MaskPerformance)
-		case "INTERNAL":
+		case MaskInternalStr:
 			mask = mask.Add(MaskInternal)
-		case "PER_USER":
+		case MaskPerUserStr:
 			mask = mask.Add(MaskPerUser)
-		case "PER_REQUEST":
+		case MaskPerRequestStr:
 			mask = mask.Add(MaskPerRequest)
-		case "DETAILED":
+		case MaskDetailedStr:
 			mask = mask.Add(MaskDetailed)
 		}
 	}
