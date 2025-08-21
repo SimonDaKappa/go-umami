@@ -181,6 +181,11 @@ func (f *factory) TimerVec(opts TimerVecOpts, level Level, mask Mask) TimerVec {
 
 // Cache creates cache metrics with the given level and mask
 func (f *factory) Cache(opts CacheOpts, level Level, mask Mask) Cache {
+	// Check if this metric should be enabled
+	if !level.Enabled(f.level) || !f.mask.Has(mask) {
+		return &noopCache{}
+	}
+
 	hits := f.Counter(opts.HitOpts, level, mask)
 	misses := f.Counter(opts.MissOpts, level, mask)
 	size := f.Gauge(opts.SizeOpts, level, mask)
@@ -194,6 +199,11 @@ func (f *factory) Cache(opts CacheOpts, level Level, mask Mask) Cache {
 
 // CacheVec creates a cache vector with the given level and mask
 func (f *factory) CacheVec(opts CacheVecOpts, level Level, mask Mask) CacheVec {
+	// Check if this metric should be enabled
+	if !level.Enabled(f.level) || !f.mask.Has(mask) {
+		return &noopCacheVec{}
+	}
+
 	hits := f.CounterVec(opts.HitVecOpts, level, mask)
 	misses := f.CounterVec(opts.MissVecOpts, level, mask)
 	size := f.GaugeVec(opts.SizeVecOpts, level, mask)
@@ -207,6 +217,11 @@ func (f *factory) CacheVec(opts CacheVecOpts, level Level, mask Mask) CacheVec {
 
 // Pool creates pool metrics with the given level and mask
 func (f *factory) Pool(opts PoolOpts, level Level, mask Mask) Pool {
+	// Check if this metric should be enabled
+	if !level.Enabled(f.level) || !f.mask.Has(mask) {
+		return &noopPool{}
+	}
+
 	active := f.Gauge(opts.ActiveOpts, level, mask)
 	idle := f.Gauge(opts.IdleOpts, level, mask)
 	acquired := f.Counter(opts.AcquiredOpts, level, mask)
@@ -222,6 +237,11 @@ func (f *factory) Pool(opts PoolOpts, level Level, mask Mask) Pool {
 
 // PoolVec creates a pool vector with the given level and mask
 func (f *factory) PoolVec(opts PoolVecOpts, level Level, mask Mask) PoolVec {
+	// Check if this metric should be enabled
+	if !level.Enabled(f.level) || !f.mask.Has(mask) {
+		return &noopPoolVec{}
+	}
+
 	active := f.GaugeVec(opts.ActiveVecOpts, level, mask)
 	idle := f.GaugeVec(opts.IdleVecOpts, level, mask)
 	acquired := f.CounterVec(opts.AcquiredVecOpts, level, mask)
@@ -237,6 +257,11 @@ func (f *factory) PoolVec(opts PoolVecOpts, level Level, mask Mask) PoolVec {
 
 // CircuitBreaker creates circuit breaker metrics with the given level and mask
 func (f *factory) CircuitBreaker(opts CircuitBreakerOpts, level Level, mask Mask) CircuitBreaker {
+	// Check if this metric should be enabled
+	if !level.Enabled(f.level) || !f.mask.Has(mask) {
+		return &noopCircuitBreaker{}
+	}
+
 	state := f.Gauge(opts.StateOpts, level, mask)
 	successes := f.Counter(opts.SuccessOpts, level, mask)
 	failures := f.Counter(opts.FailureOpts, level, mask)
@@ -250,6 +275,11 @@ func (f *factory) CircuitBreaker(opts CircuitBreakerOpts, level Level, mask Mask
 
 // CircuitBreakerVec creates a circuit breaker vector with the given level and mask
 func (f *factory) CircuitBreakerVec(opts CircuitBreakerVecOpts, level Level, mask Mask) CircuitBreakerVec {
+	// Check if this metric should be enabled
+	if !level.Enabled(f.level) || !f.mask.Has(mask) {
+		return &noopCircuitBreakerVec{}
+	}
+
 	state := f.GaugeVec(opts.StateVecOpts, level, mask)
 	successes := f.CounterVec(opts.SuccessVecOpts, level, mask)
 	failures := f.CounterVec(opts.FailureVecOpts, level, mask)
@@ -263,6 +293,11 @@ func (f *factory) CircuitBreakerVec(opts CircuitBreakerVecOpts, level Level, mas
 
 // Queue creates queue metrics with the given level and mask
 func (f *factory) Queue(opts QueueOpts, level Level, mask Mask) Queue {
+	// Check if this metric should be enabled
+	if !level.Enabled(f.level) || !f.mask.Has(mask) {
+		return &noopQueue{}
+	}
+
 	depth := f.Gauge(opts.DepthOpts, level, mask)
 	enqueued := f.Counter(opts.EnqueuedOpts, level, mask)
 	dequeued := f.Counter(opts.DequeuedOpts, level, mask)
@@ -278,6 +313,11 @@ func (f *factory) Queue(opts QueueOpts, level Level, mask Mask) Queue {
 
 // QueueVec creates a queue vector with the given level and mask
 func (f *factory) QueueVec(opts QueueVecOpts, level Level, mask Mask) QueueVec {
+	// Check if this metric should be enabled
+	if !level.Enabled(f.level) || !f.mask.Has(mask) {
+		return &noopQueueVec{}
+	}
+
 	depth := f.GaugeVec(opts.DepthVecOpts, level, mask)
 	enqueued := f.CounterVec(opts.EnqueuedVecOpts, level, mask)
 	dequeued := f.CounterVec(opts.DequeuedVecOpts, level, mask)
