@@ -27,38 +27,49 @@ const (
 	LevelVerbose
 )
 
+var (
+	LevelDisabledStr  = "DISABLED"
+	LevelCriticalStr  = "CRITICAL"
+	LevelImportantStr = "IMPORTANT"
+	LevelDebugStr     = "DEBUG"
+	LevelVerboseStr   = "VERBOSE"
+	LevelUnknownStr   = "UNKNOWN"
+)
+
 // String returns the string representation of the level
 func (l Level) String() string {
 	switch l {
 	case LevelDisabled:
-		return "DISABLED"
+		return LevelDisabledStr
 	case LevelCritical:
-		return "CRITICAL"
+		return LevelCriticalStr
 	case LevelImportant:
-		return "IMPORTANT"
+		return LevelImportantStr
 	case LevelDebug:
-		return "DEBUG"
+		return LevelDebugStr
 	case LevelVerbose:
-		return "VERBOSE"
+		return LevelVerboseStr
 	default:
-		return "UNKNOWN"
+		// TODO $$$SIMON Should be logged?
+		return LevelUnknownStr
 	}
 }
 
 // ParseLevel parses a level string into a Level
 func ParseLevel(s string) Level {
 	switch strings.ToUpper(s) {
-	case "DISABLED":
+	case LevelDisabledStr:
 		return LevelDisabled
-	case "CRITICAL":
+	case LevelCriticalStr:
 		return LevelCritical
-	case "IMPORTANT":
+	case LevelImportantStr:
 		return LevelImportant
-	case "DEBUG":
+	case LevelDebugStr:
 		return LevelDebug
-	case "VERBOSE":
+	case LevelVerboseStr:
 		return LevelVerbose
 	default:
+		// TODO $$$SIMON Should be logged?
 		return LevelImportant // Safe default
 	}
 }
@@ -68,84 +79,105 @@ func (l Level) Enabled(configuredLevel Level) bool {
 	return l <= configuredLevel && configuredLevel != LevelDisabled
 }
 
-// MetricMask allows fine-grained control over which metrics are enabled
+// Mask allows fine-grained control over which metrics are enabled
 // Similar to log masks but for metrics
-type MetricMask uint64
+type Mask uint64
 
 const (
 	// Core business metrics
-	MaskCounters   MetricMask = 1 << iota // Basic counters
-	MaskLatency                           // Latency/timing metrics
-	MaskThroughput                        // Rate/throughput metrics
-	MaskErrors                            // Error metrics
-
+	MaskCounters   Mask = 1 << iota // Basic counters
+	MaskLatency    Mask = 1 << 0x2  // Latency/timing metrics
+	MaskThroughput Mask = 1 << 0x3  // Rate/throughput metrics
+	MaskErrors     Mask = 1 << 0x4  // Error metrics
 	// Operational metrics
-	MaskResources   // CPU, memory, disk
-	MaskQueues      // Queue depths, processing
-	MaskConnections // DB connections, pools
-	MaskCache       // Cache hit/miss rates
-
+	MaskResources   Mask = 1 << 0x5 // CPU, memory, disk
+	MaskQueues      Mask = 1 << 0x6 // Queue depths, processing
+	MaskConnections Mask = 1 << 0x7 // DB connections, pools
+	MaskCache       Mask = 1 << 0x8 // Cache hit/miss rates
 	// Advanced metrics
-	MaskCircuitBreaker // Circuit breaker states
-	MaskHealth         // Health check results
-	MaskSecurity       // Auth, rate limiting
-	MaskPerformance    // Detailed performance breakdowns
-
+	MaskCircuitBreaker Mask = 1 << 0x9 // Circuit breaker states
+	MaskHealth         Mask = 1 << 0xA // Health check results
+	MaskSecurity       Mask = 1 << 0xB // Auth, rate limiting
+	MaskPerformance    Mask = 1 << 0xC // Detailed performance breakdowns
 	// Development/Debug metrics
-	MaskInternal   // Internal state metrics
-	MaskPerUser    // Per-user metrics
-	MaskPerRequest // Per-request metrics
-	MaskDetailed   // Very detailed breakdowns
+	MaskInternal   Mask = 1 << 0xD  // Internal state metrics
+	MaskPerUser    Mask = 1 << 0xE  // Per-user metrics
+	MaskPerRequest Mask = 1 << 0xF  // Per-request metrics
+	MaskDetailed   Mask = 1 << 0x10 // Very detailed breakdowns
 
 	// Convenience masks
-	MaskNone       MetricMask = 0
-	MaskEssential             = MaskCounters | MaskLatency | MaskErrors
-	MaskProduction            = MaskEssential | MaskThroughput | MaskResources | MaskQueues
-	MaskAll        MetricMask = ^MetricMask(0)
+	MaskNone       Mask = 0
+	MaskEssential  Mask = MaskCounters | MaskLatency | MaskErrors
+	MaskProduction Mask = MaskEssential | MaskThroughput | MaskResources | MaskQueues
+	MaskAll        Mask = ^Mask(0)
+)
+
+const (
+	MaskCountersStr       string = "COUNTERS"
+	MaskLatencyStr        string = "LATENCY"
+	MaskThroughputStr     string = "THROUGHPUT"
+	MaskErrorsStr         string = "ERRORS"
+	MaskResourcesStr      string = "RESOURCES"
+	MaskQueuesStr         string = "QUEUES"
+	MaskConnectionsStr    string = "CONNECTIONS"
+	MaskCacheStr          string = "CACHE"
+	MaskCircuitBreakerStr string = "CIRCUIT_BREAKER"
+	MaskHealthStr         string = "HEALTH"
+	MaskSecurityStr       string = "SECURITY"
+	MaskPerformanceStr    string = "PERFORMANCE"
+	MaskInternalStr       string = "INTERNAL"
+	MaskPerUserStr        string = "PER_USER"
+	MaskPerRequestStr     string = "PER_REQUEST"
+	MaskDetailedStr       string = "DETAILED"
+
+	MaskNoneStr       string = "NONE"
+	MaskEssentialStr  string = "ESSENTIAL"
+	MaskProductionStr string = "PRODUCTION"
+	MaskAllStr        string = "ALL"
 )
 
 // Has returns true if the mask has the specified flag
-func (m MetricMask) Has(flag MetricMask) bool {
+func (m Mask) Has(flag Mask) bool {
 	return m&flag != 0
 }
 
 // Add adds a flag to the mask
-func (m MetricMask) Add(flag MetricMask) MetricMask {
+func (m Mask) Add(flag Mask) Mask {
 	return m | flag
 }
 
 // Remove removes a flag from the mask
-func (m MetricMask) Remove(flag MetricMask) MetricMask {
+func (m Mask) Remove(flag Mask) Mask {
 	return m &^ flag
 }
 
 // String returns a human-readable representation of the mask
-func (m MetricMask) String() string {
+func (m Mask) String() string {
 	if m == MaskNone {
-		return "NONE"
+		return MaskNoneStr
 	}
 	if m == MaskAll {
-		return "ALL"
+		return MaskAllStr
 	}
 
 	var parts []string
-	flags := map[MetricMask]string{
-		MaskCounters:       "COUNTERS",
-		MaskLatency:        "LATENCY",
-		MaskThroughput:     "THROUGHPUT",
-		MaskErrors:         "ERRORS",
-		MaskResources:      "RESOURCES",
-		MaskQueues:         "QUEUES",
-		MaskConnections:    "CONNECTIONS",
-		MaskCache:          "CACHE",
-		MaskCircuitBreaker: "CIRCUIT_BREAKER",
-		MaskHealth:         "HEALTH",
-		MaskSecurity:       "SECURITY",
-		MaskPerformance:    "PERFORMANCE",
-		MaskInternal:       "INTERNAL",
-		MaskPerUser:        "PER_USER",
-		MaskPerRequest:     "PER_REQUEST",
-		MaskDetailed:       "DETAILED",
+	flags := map[Mask]string{
+		MaskCounters:       MaskCountersStr,
+		MaskLatency:        MaskLatencyStr,
+		MaskThroughput:     MaskThroughputStr,
+		MaskErrors:         MaskErrorsStr,
+		MaskResources:      MaskResourcesStr,
+		MaskQueues:         MaskQueuesStr,
+		MaskConnections:    MaskConnectionsStr,
+		MaskCache:          MaskCacheStr,
+		MaskCircuitBreaker: MaskCircuitBreakerStr,
+		MaskHealth:         MaskHealthStr,
+		MaskSecurity:       MaskSecurityStr,
+		MaskPerformance:    MaskPerformanceStr,
+		MaskInternal:       MaskInternalStr,
+		MaskPerUser:        MaskPerUserStr,
+		MaskPerRequest:     MaskPerRequestStr,
+		MaskDetailed:       MaskDetailedStr,
 	}
 
 	for flag, name := range flags {

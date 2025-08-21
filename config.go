@@ -6,11 +6,11 @@ import (
 	"strings"
 )
 
-// Configuration represents the metrics configuration
-type Configuration struct {
+// Config represents the metrics configuration
+type Config struct {
 	// Global settings
-	GlobalLevel Level      `json:"global_level" yaml:"global_level"`
-	GlobalMask  MetricMask `json:"global_mask" yaml:"global_mask"`
+	GlobalLevel Level `json:"global_level" yaml:"global_level"`
+	GlobalMask  Mask  `json:"global_mask" yaml:"global_mask"`
 
 	// Per-group settings
 	Groups map[string]GroupConfig `json:"groups" yaml:"groups"`
@@ -21,8 +21,8 @@ type Configuration struct {
 
 // GroupConfig represents configuration for a specific metric group
 type GroupConfig struct {
-	Level Level      `json:"level" yaml:"level"`
-	Mask  MetricMask `json:"mask" yaml:"mask"`
+	Level Level `json:"level" yaml:"level"`
+	Mask  Mask  `json:"mask" yaml:"mask"`
 }
 
 // BackendConfig represents backend-specific configuration
@@ -31,25 +31,22 @@ type BackendConfig struct {
 	Config map[string]any `json:"config" yaml:"config"` // Backend-specific configuration
 }
 
-// DefaultConfiguration returns a sensible default configuration
-func DefaultConfiguration(backend string) *Configuration {
-	return &Configuration{
+// DefaultConfig returns a sensible default configuration
+func DefaultConfig() *Config {
+	return &Config{
 		GlobalLevel: LevelImportant,
 		GlobalMask:  MaskProduction,
-		Groups:      map[string]GroupConfig{},
+		Groups:      make(map[string]GroupConfig),
 		Backend: BackendConfig{
-			Type: "prometheus",
-			Config: map[string]any{
-				"namespace": "pacrag",
-				"subsystem": "webserver",
-			},
+			Type:   BackendNoneName,
+			Config: make(map[string]any),
 		},
 	}
 }
 
-// ProductionConfiguration returns a production-ready configuration
-func ProductionConfiguration() *Configuration {
-	config := DefaultConfiguration()
+// ProductionConfig returns a production-ready configuration
+func ProductionConfig(backend Backend) *Config {
+	config := DefaultConfig()
 	config.GlobalLevel = LevelImportant
 	config.GlobalMask = MaskProduction
 
@@ -61,12 +58,14 @@ func ProductionConfiguration() *Configuration {
 		config.Groups[name] = group
 	}
 
+	config.Backend.Type = backend.Name()
+
 	return config
 }
 
-// DevelopmentConfiguration returns a development configuration with more verbose metrics
-func DevelopmentConfiguration() *Configuration {
-	config := DefaultConfiguration()
+// DevelopmentConfig returns a development configuration with more verbose metrics
+func DevelopmentConfig(backend Backend) *Config {
+	config := DefaultConfig()
 	config.GlobalLevel = LevelVerbose
 	config.GlobalMask = MaskAll
 
@@ -77,17 +76,19 @@ func DevelopmentConfiguration() *Configuration {
 		config.Groups[name] = group
 	}
 
+	config.Backend.Type = backend.Name()
+
 	return config
 }
 
-// LoadConfigurationFromFile loads configuration from a JSON file
-func LoadConfigurationFromFile(filename string) (*Configuration, error) {
+// LoadConfigFromFile loads configuration from a JSON file
+func LoadConfigFromFile(filename string) (*Config, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
 
-	var config Configuration
+	var config Config
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, err
 	}
@@ -95,22 +96,30 @@ func LoadConfigurationFromFile(filename string) (*Configuration, error) {
 	return &config, nil
 }
 
-// LoadConfigurationFromEnv loads configuration from environment variables
-func LoadConfigurationFromEnv() *Configuration {
-	config := DefaultConfiguration()
+const (
+	EnvMetricsBackendKey  string = "METRICS_BACKEND"
+	EnvMetricsLevelKey    string = "METRICS_LEVEL"
+	EnvMetricsMaskKey     string = "METRICS_MASK"
+	EnvMetricsGroupPrefix string = "METRICS_GROUP_"
+)
+
+// LoadConfigFromEnv loads configuration from environment variables
+func LoadConfigFromEnv() *Config {
+
+	config := DefaultConfig()
 
 	// Global level
-	if levelStr := os.Getenv("METRICS_LEVEL"); levelStr != "" {
+	if levelStr := os.Getenv(EnvMetricsLevelKey); levelStr != "" {
 		config.GlobalLevel = ParseLevel(levelStr)
 	}
 
 	// Global mask
-	if maskStr := os.Getenv("METRICS_MASK"); maskStr != "" {
+	if maskStr := os.Getenv(EnvMetricsMaskKey); maskStr != "" {
 		config.GlobalMask = ParseMask(maskStr)
 	}
 
 	// Backend type
-	if backendType := os.Getenv("METRICS_BACKEND"); backendType != "" {
+	if backendType := os.Getenv(EnvMetricsBackendKey); backendType != "" {
 		config.Backend.Type = backendType
 	}
 
@@ -118,7 +127,7 @@ func LoadConfigurationFromEnv() *Configuration {
 	// Format: METRICS_GROUP_<NAME>_LEVEL=<level>
 	// Format: METRICS_GROUP_<NAME>_MASK=<mask>
 	for _, env := range os.Environ() {
-		if strings.HasPrefix(env, "METRICS_GROUP_") {
+		if strings.HasPrefix(env, EnvMetricsGroupPrefix) {
 			parts := strings.SplitN(env, "=", 2)
 			if len(parts) != 2 {
 				continue
@@ -152,13 +161,13 @@ func LoadConfigurationFromEnv() *Configuration {
 }
 
 // ParseMask parses a mask string into a MetricMask
-func ParseMask(s string) MetricMask {
+func ParseMask(s string) Mask {
 	if s == "" {
 		return MaskProduction
 	}
 
 	switch strings.ToUpper(s) {
-	case "NONE":
+	case MaskNone.String():
 		return MaskNone
 	case "ESSENTIAL":
 		return MaskEssential
@@ -169,7 +178,7 @@ func ParseMask(s string) MetricMask {
 	}
 
 	// Parse individual flags separated by |
-	var mask MetricMask
+	var mask Mask
 	flags := strings.Split(strings.ToUpper(s), "|")
 
 	for _, flag := range flags {
@@ -213,8 +222,8 @@ func ParseMask(s string) MetricMask {
 	return mask
 }
 
-// ApplyConfiguration applies the configuration to a metrics manager
-func ApplyConfiguration(manager Manager, config *Configuration) {
+// ApplyConfig applies the configuration to a metrics manager
+func ApplyConfig(manager Manager, config *Config) {
 	// Apply global settings
 	manager.SetGlobalLevel(config.GlobalLevel)
 	manager.SetGlobalMask(config.GlobalMask)
@@ -227,8 +236,8 @@ func ApplyConfiguration(manager Manager, config *Configuration) {
 	}
 }
 
-// SaveConfiguration saves configuration to a JSON file
-func (c *Configuration) SaveToFile(filename string) error {
+// SaveToFile saves configuration to a JSON file
+func (c *Config) SaveToFile(filename string) error {
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err

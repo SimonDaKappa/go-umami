@@ -1,17 +1,15 @@
 package umami
 
-import "time"
-
 // factory implements the Factory interface
 type factory struct {
 	backend Backend
 	group   string
 	level   Level
-	mask    MetricMask
+	mask    Mask
 }
 
 // newFactory creates a new factory
-func newFactory(backend Backend, group string, level Level, mask MetricMask) Factory {
+func newFactory(backend Backend, group string, level Level, mask Mask) Factory {
 	return &factory{
 		backend: backend,
 		group:   group,
@@ -21,33 +19,65 @@ func newFactory(backend Backend, group string, level Level, mask MetricMask) Fac
 }
 
 // Counter creates a counter with the given level and mask
-func (f *factory) Counter(name string, level Level, mask MetricMask, labels ...string) Counter {
-	fullName := f.group + "_" + name
+func (f *factory) Counter(opts CounterOpts, level Level, mask Mask) Counter {
+	opts.Name = f.group + "_" + opts.Name
 
 	// Check if this metric should be enabled
 	if !level.Enabled(f.level) || !f.mask.Has(mask) {
 		return &noopCounter{}
 	}
 
-	backend := f.backend.Counter(fullName, labels...)
-	return &counter{
-		backend: backend,
+	cbackend := f.backend.Counter(opts)
+	return &baseCounter{
+		backend: cbackend,
+		level:   level,
+		mask:    mask,
+	}
+}
+
+func (f *factory) CounterVec(opts CounterVecOpts, level Level, mask Mask) CounterVec {
+	opts.Name = f.group + "_" + opts.Name
+
+	// Check if this metric should be enabled
+	if !level.Enabled(f.level) || !f.mask.Has(mask) {
+		return &noopCounterVec{}
+	}
+
+	cbackend := f.backend.CounterVec(opts)
+	return &baseCounterVec{
+		backend: cbackend,
 		level:   level,
 		mask:    mask,
 	}
 }
 
 // Gauge creates a gauge with the given level and mask
-func (f *factory) Gauge(name string, level Level, mask MetricMask, labels ...string) Gauge {
-	fullName := f.group + "_" + name
+func (f *factory) Gauge(opts GaugeOpts, level Level, mask Mask) Gauge {
+	opts.Name = f.group + "_" + opts.Name
 
 	// Check if this metric should be enabled
 	if !level.Enabled(f.level) || !f.mask.Has(mask) {
 		return &noopGauge{}
 	}
 
-	backend := f.backend.Gauge(fullName, labels...)
-	return &gauge{
+	backend := f.backend.Gauge(opts)
+	return &baseGauge{
+		backend: backend,
+		level:   level,
+		mask:    mask,
+	}
+}
+
+func (f *factory) GaugeVec(opts GaugeVecOpts, level Level, mask Mask) GaugeVec {
+	opts.Name = f.group + "_" + opts.Name
+
+	// Check if this metric should be enabled
+	if !level.Enabled(f.level) || !f.mask.Has(mask) {
+		return &noopGaugeVec{}
+	}
+
+	backend := f.backend.GaugeVec(opts)
+	return &baseGaugeVec{
 		backend: backend,
 		level:   level,
 		mask:    mask,
@@ -55,16 +85,32 @@ func (f *factory) Gauge(name string, level Level, mask MetricMask, labels ...str
 }
 
 // Histogram creates a histogram with the given level and mask
-func (f *factory) Histogram(name string, level Level, mask MetricMask, buckets []float64, labels ...string) Histogram {
-	fullName := f.group + "_" + name
+func (f *factory) Histogram(opts HistogramOpts, level Level, mask Mask) Histogram {
+	opts.Name = f.group + "_" + opts.Name
 
 	// Check if this metric should be enabled
 	if !level.Enabled(f.level) || !f.mask.Has(mask) {
 		return &noopHistogram{}
 	}
 
-	backend := f.backend.Histogram(fullName, buckets, labels...)
-	return &histogram{
+	backend := f.backend.Histogram(opts)
+	return &baseHistogram{
+		backend: backend,
+		level:   level,
+		mask:    mask,
+	}
+}
+
+func (f *factory) HistogramVec(opts HistogramVecOpts, level Level, mask Mask) HistogramVec {
+	opts.Name = f.group + "_" + opts.Name
+
+	// Check if this metric should be enabled
+	if !level.Enabled(f.level) || !f.mask.Has(mask) {
+		return &noopHistogramVec{}
+	}
+
+	backend := f.backend.HistogramVec(opts)
+	return &baseHistogramVec{
 		backend: backend,
 		level:   level,
 		mask:    mask,
@@ -72,16 +118,32 @@ func (f *factory) Histogram(name string, level Level, mask MetricMask, buckets [
 }
 
 // Summary creates a summary with the given level and mask
-func (f *factory) Summary(name string, level Level, mask MetricMask, objectives map[float64]float64, labels ...string) Summary {
-	fullName := f.group + "_" + name
+func (f *factory) Summary(opts SummaryOpts, level Level, mask Mask) Summary {
+	opts.Name = f.group + "_" + opts.Name
 
 	// Check if this metric should be enabled
 	if !level.Enabled(f.level) || !f.mask.Has(mask) {
 		return &noopSummary{}
 	}
 
-	backend := f.backend.Summary(fullName, objectives, labels...)
-	return &summary{
+	backend := f.backend.Summary(opts)
+	return &baseSummary{
+		backend: backend,
+		level:   level,
+		mask:    mask,
+	}
+}
+
+func (f *factory) SummaryVec(opts SummaryVecOpts, level Level, mask Mask) SummaryVec {
+	opts.Name = f.group + "_" + opts.Name
+
+	// Check if this metric should be enabled
+	if !level.Enabled(f.level) || !f.mask.Has(mask) {
+		return &noopSummaryVec{}
+	}
+
+	backend := f.backend.SummaryVec(opts)
+	return &baseSummaryVec{
 		backend: backend,
 		level:   level,
 		mask:    mask,
@@ -89,22 +151,49 @@ func (f *factory) Summary(name string, level Level, mask MetricMask, objectives 
 }
 
 // Timer creates a timer with the given level and mask
-func (f *factory) Timer(name string, level Level, mask MetricMask, labels ...string) Timer {
-	// Timer is built on top of histogram
-	hist := f.Histogram(name+"_duration_seconds", level, mask, []float64{
-		0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10,
-	}, labels...)
+func (f *factory) Timer(opts TimerOpts, level Level, mask Mask) Timer {
+	// Check if this metric should be enabled
+	if !level.Enabled(f.level) || !f.mask.Has(mask) {
+		return &noopTimer{}
+	}
 
-	return &timer{histogram: hist}
+	// Timer is built on top of histogram
+	hist := f.Histogram(opts.HistOpts, level, mask)
+
+	return &baseTimer{histogram: hist}
+}
+
+func (f *factory) TimerVec(opts TimerVecOpts, level Level, mask Mask) TimerVec {
+	// Check if this metric should be enabled
+	if !level.Enabled(f.level) || !f.mask.Has(mask) {
+		return &noopTimerVec{}
+	}
+
+	// TimerVec is built on top of HistogramVec
+	hist := f.HistogramVec(opts.HistVecOpts, level, mask)
+
+	return &baseTimerVec{histogram: hist}
 }
 
 // Cache creates cache metrics with the given level and mask
-func (f *factory) Cache(name string, level Level, mask MetricMask, labels ...string) Cache {
-	hits := f.Counter(name+"_hits", level, mask, labels...)
-	misses := f.Counter(name+"_misses", level, mask, labels...)
-	size := f.Gauge(name+"_size_bytes", level, mask, labels...)
+func (f *factory) Cache(opts CacheOpts, level Level, mask Mask) Cache {
+	hits := f.Counter(opts.HitOpts, level, mask)
+	misses := f.Counter(opts.MissOpts, level, mask)
+	size := f.Gauge(opts.SizeOpts, level, mask)
 
-	return &cache{
+	return &baseCache{
+		hits:   hits,
+		misses: misses,
+		size:   size,
+	}
+}
+
+func (f *factory) CacheVec(opts CacheVecOpts, level Level, mask Mask) CacheVec {
+	hits := f.CounterVec(opts.HitVecOpts, level, mask)
+	misses := f.CounterVec(opts.MissVecOpts, level, mask)
+	size := f.GaugeVec(opts.SizeVecOpts, level, mask)
+
+	return &baseCacheVec{
 		hits:   hits,
 		misses: misses,
 		size:   size,
@@ -112,13 +201,27 @@ func (f *factory) Cache(name string, level Level, mask MetricMask, labels ...str
 }
 
 // Pool creates pool metrics with the given level and mask
-func (f *factory) Pool(name string, level Level, mask MetricMask, labels ...string) Pool {
-	active := f.Gauge(name+"_active", level, mask, labels...)
-	idle := f.Gauge(name+"_idle", level, mask, labels...)
-	acquired := f.Counter(name+"_acquired", level, mask, labels...)
-	released := f.Counter(name+"_released", level, mask, labels...)
+func (f *factory) Pool(opts PoolOpts, level Level, mask Mask) Pool {
+	active := f.Gauge(opts.ActiveOpts, level, mask)
+	idle := f.Gauge(opts.IdleOpts, level, mask)
+	acquired := f.Counter(opts.AcquiredOpts, level, mask)
+	released := f.Counter(opts.ReleasedOpts, level, mask)
 
-	return &pool{
+	return &basePool{
+		active:   active,
+		idle:     idle,
+		acquired: acquired,
+		released: released,
+	}
+}
+
+func (f *factory) PoolVec(opts PoolVecOpts, level Level, mask Mask) PoolVec {
+	active := f.GaugeVec(opts.ActiveVecOpts, level, mask)
+	idle := f.GaugeVec(opts.IdleVecOpts, level, mask)
+	acquired := f.CounterVec(opts.AcquiredVecOpts, level, mask)
+	released := f.CounterVec(opts.ReleasedVecOpts, level, mask)
+
+	return &basePoolVec{
 		active:   active,
 		idle:     idle,
 		acquired: acquired,
@@ -127,12 +230,24 @@ func (f *factory) Pool(name string, level Level, mask MetricMask, labels ...stri
 }
 
 // CircuitBreaker creates circuit breaker metrics with the given level and mask
-func (f *factory) CircuitBreaker(name string, level Level, mask MetricMask, labels ...string) CircuitBreaker {
-	state := f.Gauge(name+"_state", level, mask, labels...)
-	successes := f.Counter(name+"_successes", level, mask, labels...)
-	failures := f.Counter(name+"_failures", level, mask, labels...)
+func (f *factory) CircuitBreaker(opts CircuitBreakerOpts, level Level, mask Mask) CircuitBreaker {
+	state := f.Gauge(opts.StateOpts, level, mask)
+	successes := f.Counter(opts.SuccessOpts, level, mask)
+	failures := f.Counter(opts.FailureOpts, level, mask)
 
-	return &circuitBreaker{
+	return &baseCircuitBreaker{
+		state:     state,
+		successes: successes,
+		failures:  failures,
+	}
+}
+
+func (f *factory) CircuitBreakerVec(opts CircuitBreakerVecOpts, level Level, mask Mask) CircuitBreakerVec {
+	state := f.GaugeVec(opts.StateVecOpts, level, mask)
+	successes := f.CounterVec(opts.SuccessVecOpts, level, mask)
+	failures := f.CounterVec(opts.FailureVecOpts, level, mask)
+
+	return &baseCircuitBreakerVec{
 		state:     state,
 		successes: successes,
 		failures:  failures,
@@ -140,15 +255,13 @@ func (f *factory) CircuitBreaker(name string, level Level, mask MetricMask, labe
 }
 
 // Queue creates queue metrics with the given level and mask
-func (f *factory) Queue(name string, level Level, mask MetricMask, labels ...string) Queue {
-	depth := f.Gauge(name+"_depth", level, mask, labels...)
-	enqueued := f.Counter(name+"_enqueued", level, mask, labels...)
-	dequeued := f.Counter(name+"_dequeued", level, mask, labels...)
-	waitTime := f.Histogram(name+"_wait_time_seconds", level, mask, []float64{
-		0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10,
-	}, labels...)
+func (f *factory) Queue(opts QueueOpts, level Level, mask Mask) Queue {
+	depth := f.Gauge(opts.DepthOpts, level, mask)
+	enqueued := f.Counter(opts.EnqueuedOpts, level, mask)
+	dequeued := f.Counter(opts.DequeuedOpts, level, mask)
+	waitTime := f.Histogram(opts.WaitTimeOpts, level, mask)
 
-	return &queue{
+	return &baseQueue{
 		depth:    depth,
 		enqueued: enqueued,
 		dequeued: dequeued,
@@ -156,223 +269,16 @@ func (f *factory) Queue(name string, level Level, mask MetricMask, labels ...str
 	}
 }
 
-// Concrete metric implementations
+func (f *factory) QueueVec(opts QueueVecOpts, level Level, mask Mask) QueueVec {
+	depth := f.GaugeVec(opts.DepthVecOpts, level, mask)
+	enqueued := f.CounterVec(opts.EnqueuedVecOpts, level, mask)
+	dequeued := f.CounterVec(opts.DequeuedVecOpts, level, mask)
+	waitTime := f.HistogramVec(opts.WaitTimeVecOpts, level, mask)
 
-// counter wraps a CounterBackend and implements early return
-type counter struct {
-	backend CounterBackend
-	level   Level
-	mask    MetricMask
-}
-
-func (c *counter) Inc(ctx Context) error {
-	if !ctx.Enabled(c.level) || !ctx.EnabledMask(c.mask) {
-		return nil // Early return
+	return &baseQueueVec{
+		depth:    depth,
+		enqueued: enqueued,
+		dequeued: dequeued,
+		waitTime: waitTime,
 	}
-	return c.backend.Inc()
-}
-
-func (c *counter) Add(ctx Context, value float64) error {
-	if !ctx.Enabled(c.level) || !ctx.EnabledMask(c.mask) {
-		return nil // Early return
-	}
-	return c.backend.Add(value)
-}
-
-// gauge wraps a GaugeBackend and implements early return
-type gauge struct {
-	backend GaugeBackend
-	level   Level
-	mask    MetricMask
-}
-
-func (g *gauge) Set(ctx Context, value float64) error {
-	if !ctx.Enabled(g.level) || !ctx.EnabledMask(g.mask) {
-		return nil // Early return
-	}
-	return g.backend.Set(value)
-}
-
-func (g *gauge) Inc(ctx Context) error {
-	if !ctx.Enabled(g.level) || !ctx.EnabledMask(g.mask) {
-		return nil // Early return
-	}
-	return g.backend.Inc()
-}
-
-func (g *gauge) Dec(ctx Context) error {
-	if !ctx.Enabled(g.level) || !ctx.EnabledMask(g.mask) {
-		return nil // Early return
-	}
-	return g.backend.Dec()
-}
-
-func (g *gauge) Add(ctx Context, value float64) error {
-	if !ctx.Enabled(g.level) || !ctx.EnabledMask(g.mask) {
-		return nil // Early return
-	}
-	return g.backend.Add(value)
-}
-
-// histogram wraps a HistogramBackend and implements early return
-type histogram struct {
-	backend HistogramBackend
-	level   Level
-	mask    MetricMask
-}
-
-func (h *histogram) Observe(ctx Context, value float64) error {
-	if !ctx.Enabled(h.level) || !ctx.EnabledMask(h.mask) {
-		return nil // Early return
-	}
-	return h.backend.Observe(value)
-}
-
-func (h *histogram) Time(ctx Context, fn func() error) error {
-	if !ctx.Enabled(h.level) || !ctx.EnabledMask(h.mask) {
-		return fn() // Execute function but don't time it
-	}
-
-	start := time.Now()
-	err := fn()
-	duration := time.Since(start)
-	h.backend.Observe(duration.Seconds())
-	return err
-}
-
-// summary wraps a SummaryBackend and implements early return
-type summary struct {
-	backend SummaryBackend
-	level   Level
-	mask    MetricMask
-}
-
-func (s *summary) Observe(ctx Context, value float64) error {
-	if !ctx.Enabled(s.level) || !ctx.EnabledMask(s.mask) {
-		return nil // Early return
-	}
-	return s.backend.Observe(value)
-}
-
-func (s *summary) Quantile(ctx Context, q float64) (float64, error) {
-	if !ctx.Enabled(s.level) || !ctx.EnabledMask(s.mask) {
-		return 0, nil // Early return with safe default
-	}
-	return s.backend.Quantile(q)
-}
-
-// Composite metric implementations
-
-// timer combines a histogram for timing
-type timer struct {
-	histogram Histogram
-}
-
-func (t *timer) Start(ctx Context) func() {
-	start := time.Now()
-	return func() {
-		duration := time.Since(start)
-		t.histogram.Observe(ctx, duration.Seconds())
-	}
-}
-
-func (t *timer) Record(ctx Context, duration time.Duration) error {
-	return t.histogram.Observe(ctx, duration.Seconds())
-}
-
-// cache combines multiple metrics for cache operations
-type cache struct {
-	hits   Counter
-	misses Counter
-	size   Gauge
-}
-
-func (c *cache) Hit(ctx Context) error {
-	return c.hits.Inc(ctx)
-}
-
-func (c *cache) Miss(ctx Context) error {
-	return c.misses.Inc(ctx)
-}
-
-func (c *cache) SetSize(ctx Context, bytes int64) error {
-	return c.size.Set(ctx, float64(bytes))
-}
-
-// pool combines multiple metrics for pool operations
-type pool struct {
-	active   Gauge
-	idle     Gauge
-	acquired Counter
-	released Counter
-}
-
-func (p *pool) SetActive(ctx Context, count int) error {
-	return p.active.Set(ctx, float64(count))
-}
-
-func (p *pool) SetIdle(ctx Context, count int) error {
-	return p.idle.Set(ctx, float64(count))
-}
-
-func (p *pool) Acquired(ctx Context) error {
-	return p.acquired.Inc(ctx)
-}
-
-func (p *pool) Released(ctx Context) error {
-	return p.released.Inc(ctx)
-}
-
-// circuitBreaker combines multiple metrics for circuit breaker operations
-type circuitBreaker struct {
-	state     Gauge
-	successes Counter
-	failures  Counter
-}
-
-func (cb *circuitBreaker) SetState(ctx Context, state string) error {
-	var value float64
-	switch state {
-	case "closed":
-		value = 0
-	case "open":
-		value = 1
-	case "half-open":
-		value = 2
-	default:
-		value = -1
-	}
-	return cb.state.Set(ctx, value)
-}
-
-func (cb *circuitBreaker) Success(ctx Context) error {
-	return cb.successes.Inc(ctx)
-}
-
-func (cb *circuitBreaker) Failure(ctx Context) error {
-	return cb.failures.Inc(ctx)
-}
-
-// queue combines multiple metrics for queue operations
-type queue struct {
-	depth    Gauge
-	enqueued Counter
-	dequeued Counter
-	waitTime Histogram
-}
-
-func (q *queue) SetDepth(ctx Context, depth int) error {
-	return q.depth.Set(ctx, float64(depth))
-}
-
-func (q *queue) Enqueued(ctx Context) error {
-	return q.enqueued.Inc(ctx)
-}
-
-func (q *queue) Dequeued(ctx Context) error {
-	return q.dequeued.Inc(ctx)
-}
-
-func (q *queue) SetWaitTime(ctx Context, duration time.Duration) error {
-	return q.waitTime.Observe(ctx, duration.Seconds())
 }

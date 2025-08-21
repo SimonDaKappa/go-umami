@@ -5,11 +5,11 @@ import "sync"
 // metricsContext implements the Context interface
 type metricsContext struct {
 	level Level
-	mask  MetricMask
+	mask  Mask
 }
 
 // NewContext creates a new metrics context with the given level and mask
-func NewContext(level Level, mask MetricMask) Context {
+func NewContext(level Level, mask Mask) Context {
 	return &metricsContext{
 		level: level,
 		mask:  mask,
@@ -22,7 +22,7 @@ func (c *metricsContext) Enabled(level Level) bool {
 }
 
 // EnabledMask returns true if metrics with this mask should be processed
-func (c *metricsContext) EnabledMask(mask MetricMask) bool {
+func (c *metricsContext) EnabledMask(mask Mask) bool {
 	return c.mask.Has(mask)
 }
 
@@ -35,7 +35,7 @@ func (c *metricsContext) WithLevel(level Level) Context {
 }
 
 // WithMask returns a new context with the specified mask
-func (c *metricsContext) WithMask(mask MetricMask) Context {
+func (c *metricsContext) WithMask(mask Mask) Context {
 	return &metricsContext{
 		level: c.level,
 		mask:  mask,
@@ -47,8 +47,8 @@ type manager struct {
 	mu          sync.RWMutex
 	groups      map[string]*group
 	globalLevel Level
-	globalMask  MetricMask
-	backend     Backend // Pluggable backend (prometheus, datadog, etc.)
+	globalMask  Mask
+	backend     Backend
 }
 
 // NewManager creates a new metrics manager with the specified backend
@@ -93,7 +93,7 @@ func (m *manager) SetGlobalLevel(level Level) {
 }
 
 // SetGlobalMask sets the global metrics mask
-func (m *manager) SetGlobalMask(mask MetricMask) {
+func (m *manager) SetGlobalMask(mask Mask) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -117,7 +117,7 @@ type group struct {
 	mu      sync.RWMutex
 	name    string
 	level   Level
-	mask    MetricMask
+	mask    Mask
 	backend Backend
 	factory Factory
 }
@@ -144,7 +144,7 @@ func (g *group) SetLevel(level Level) {
 }
 
 // SetMask sets the mask for this group
-func (g *group) SetMask(mask MetricMask) {
+func (g *group) SetMask(mask Mask) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
