@@ -1,6 +1,6 @@
 package umami
 
-// factory implements the Factory interface
+// factory implements the [Factory] interface
 type factory struct {
 	backend Backend
 	group   string
@@ -68,6 +68,7 @@ func (f *factory) Gauge(opts GaugeOpts, level Level, mask Mask) Gauge {
 	}
 }
 
+// GaugeVec creates a gauge vector with the given level and mask
 func (f *factory) GaugeVec(opts GaugeVecOpts, level Level, mask Mask) GaugeVec {
 	opts.Name = f.group + "_" + opts.Name
 
@@ -101,6 +102,7 @@ func (f *factory) Histogram(opts HistogramOpts, level Level, mask Mask) Histogra
 	}
 }
 
+// HistogramVec creates a histogram vector with the given level and mask
 func (f *factory) HistogramVec(opts HistogramVecOpts, level Level, mask Mask) HistogramVec {
 	opts.Name = f.group + "_" + opts.Name
 
@@ -134,6 +136,7 @@ func (f *factory) Summary(opts SummaryOpts, level Level, mask Mask) Summary {
 	}
 }
 
+// SummaryVec creates a summary vector with the given level and mask
 func (f *factory) SummaryVec(opts SummaryVecOpts, level Level, mask Mask) SummaryVec {
 	opts.Name = f.group + "_" + opts.Name
 
@@ -163,6 +166,7 @@ func (f *factory) Timer(opts TimerOpts, level Level, mask Mask) Timer {
 	return &baseTimer{histogram: hist}
 }
 
+// TimerVec creates a timer vector with the given level and mask
 func (f *factory) TimerVec(opts TimerVecOpts, level Level, mask Mask) TimerVec {
 	// Check if this metric should be enabled
 	if !level.Enabled(f.level) || !f.mask.Has(mask) {
@@ -188,6 +192,7 @@ func (f *factory) Cache(opts CacheOpts, level Level, mask Mask) Cache {
 	}
 }
 
+// CacheVec creates a cache vector with the given level and mask
 func (f *factory) CacheVec(opts CacheVecOpts, level Level, mask Mask) CacheVec {
 	hits := f.CounterVec(opts.HitVecOpts, level, mask)
 	misses := f.CounterVec(opts.MissVecOpts, level, mask)
@@ -215,6 +220,7 @@ func (f *factory) Pool(opts PoolOpts, level Level, mask Mask) Pool {
 	}
 }
 
+// PoolVec creates a pool vector with the given level and mask
 func (f *factory) PoolVec(opts PoolVecOpts, level Level, mask Mask) PoolVec {
 	active := f.GaugeVec(opts.ActiveVecOpts, level, mask)
 	idle := f.GaugeVec(opts.IdleVecOpts, level, mask)
@@ -242,6 +248,7 @@ func (f *factory) CircuitBreaker(opts CircuitBreakerOpts, level Level, mask Mask
 	}
 }
 
+// CircuitBreakerVec creates a circuit breaker vector with the given level and mask
 func (f *factory) CircuitBreakerVec(opts CircuitBreakerVecOpts, level Level, mask Mask) CircuitBreakerVec {
 	state := f.GaugeVec(opts.StateVecOpts, level, mask)
 	successes := f.CounterVec(opts.SuccessVecOpts, level, mask)
@@ -269,6 +276,7 @@ func (f *factory) Queue(opts QueueOpts, level Level, mask Mask) Queue {
 	}
 }
 
+// QueueVec creates a queue vector with the given level and mask
 func (f *factory) QueueVec(opts QueueVecOpts, level Level, mask Mask) QueueVec {
 	depth := f.GaugeVec(opts.DepthVecOpts, level, mask)
 	enqueued := f.CounterVec(opts.EnqueuedVecOpts, level, mask)

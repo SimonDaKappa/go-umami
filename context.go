@@ -2,13 +2,13 @@ package umami
 
 import "sync"
 
-// metricsContext implements the Context interface
+// metricsContext implements the [Context] interface
 type metricsContext struct {
 	level Level
 	mask  Mask
 }
 
-// NewContext creates a new metrics context with the given level and mask
+// NewContext creates a new [metricsContext] with the given [Level] and [Mask]
 func NewContext(level Level, mask Mask) Context {
 	return &metricsContext{
 		level: level,
@@ -42,7 +42,7 @@ func (c *metricsContext) WithMask(mask Mask) Context {
 	}
 }
 
-// manager implements the Manager interface
+// manager implements the [Manager] interface
 type manager struct {
 	mu          sync.RWMutex
 	groups      map[string]*group
@@ -51,7 +51,7 @@ type manager struct {
 	backend     Backend
 }
 
-// NewManager creates a new metrics manager with the specified backend
+// NewManager creates a new metrics manager with the specified [Backend]
 func NewManager(backend Backend) Manager {
 	return &manager{
 		groups:      make(map[string]*group),
@@ -61,7 +61,7 @@ func NewManager(backend Backend) Manager {
 	}
 }
 
-// Group returns or creates a metric group
+// Group returns or creates a metric [Group]
 func (m *manager) Group(name string) Group {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -88,7 +88,7 @@ func (m *manager) SetGlobalLevel(level Level) {
 	m.globalLevel = level
 	// Update all existing groups
 	for _, group := range m.groups {
-		group.SetLevel(level)
+		group.SetGroupLevel(level)
 	}
 }
 
@@ -100,7 +100,7 @@ func (m *manager) SetGlobalMask(mask Mask) {
 	m.globalMask = mask
 	// Update all existing groups
 	for _, group := range m.groups {
-		group.SetMask(mask)
+		group.SetGroupMask(mask)
 	}
 }
 
@@ -133,18 +133,17 @@ func (g *group) Factory() Factory {
 	return g.factory
 }
 
-// SetLevel sets the level for this group
-func (g *group) SetLevel(level Level) {
+// SetGroupLevel sets the level for this group
+func (g *group) SetGroupLevel(level Level) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
 	g.level = level
 	// Invalidate factory so it gets recreated with new level
-	g.factory = nil
 }
 
-// SetMask sets the mask for this group
-func (g *group) SetMask(mask Mask) {
+// SetGroupMask sets the mask for this group
+func (g *group) SetGroupMask(mask Mask) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 

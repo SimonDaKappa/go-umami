@@ -2,7 +2,7 @@
 // provides a unified interface for various monitoring backends.
 // git remote add origin https://github.com/SimonDaKappa/go-umami.git
 // Currently supported monitoring backends:
-// - Prometheus [Prom]
+// - Prometheus
 // - StatsD (PLANNED)
 // - OpenTelemetry (PLANNED)
 package umami

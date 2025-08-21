@@ -160,7 +160,7 @@ func LoadConfigFromEnv() *Config {
 	return config
 }
 
-// ParseMask parses a mask string into a MetricMask
+// ParseMask parses a mask string into a [Mask]
 func ParseMask(s string) Mask {
 	if s == "" {
 		return MaskProduction
@@ -222,7 +222,7 @@ func ParseMask(s string) Mask {
 	return mask
 }
 
-// ApplyConfig applies the configuration to a metrics manager
+// ApplyConfig applies the configuration to a metrics [Manager]
 func ApplyConfig(manager Manager, config *Config) {
 	// Apply global settings
 	manager.SetGlobalLevel(config.GlobalLevel)
@@ -231,8 +231,8 @@ func ApplyConfig(manager Manager, config *Config) {
 	// Apply group-specific settings
 	for name, groupConfig := range config.Groups {
 		group := manager.Group(name)
-		group.SetLevel(groupConfig.Level)
-		group.SetMask(groupConfig.Mask)
+		group.SetGroupLevel(groupConfig.Level)
+		group.SetGroupMask(groupConfig.Mask)
 	}
 }
 
