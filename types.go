@@ -2,12 +2,10 @@ package umami
 
 import "time"
 
-// Backend interface allows plugging in different 3rd party monitoring services
+// VecLabels is a type that represents a set partition keys to values
 type VecLabels map[string]string
 
-// BaseMetricOpts contains common fields for all metrics
-
-// CounterOpts can be extended by backends for additional options
+// CounterOpts contains options for counter metrics
 type CounterOpts struct {
 	Name string
 	Help string
