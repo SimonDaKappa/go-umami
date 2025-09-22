@@ -1,18 +1,42 @@
 package umami
 
-import "sync"
+//--------------------------------------------------------------------------------
+// File: context.go
+//
+// This file contains the definition and implementation of the [Context] interface
+// for the umami metrics library.
+//--------------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------------
+// Interfaces
+//--------------------------------------------------------------------------------
+
+// Context allows checking if metrics are enabled without coupling to specific
+// implementations
+//
+// Each [Group] typically has its own Context, but they may be shared as a global
+// context for the [Registry]
+type Context interface {
+	// Enabled returns true if metrics at this level should be processed
+	Enabled(level Level) bool
+
+	// WithLevel returns a new context curried with the specified level
+	WithLevel(level Level) Context
+}
+
+//--------------------------------------------------------------------------------
+// Context Implementation
+//--------------------------------------------------------------------------------
 
 // metricsContext implements the [Context] interface
 type metricsContext struct {
 	level Level
-	mask  Mask
 }
 
-// NewContext creates a new [metricsContext] with the given [Level] and [Mask]
-func NewContext(level Level, mask Mask) Context {
+// NewContext creates a new [metricsContext] with the given [Level]
+func NewContext(level Level) Context {
 	return &metricsContext{
 		level: level,
-		mask:  mask,
 	}
 }
 
@@ -21,141 +45,9 @@ func (c *metricsContext) Enabled(level Level) bool {
 	return level.Enabled(c.level)
 }
 
-// EnabledMask returns true if metrics with this mask should be processed
-func (c *metricsContext) EnabledMask(mask Mask) bool {
-	return c.mask.Has(mask)
-}
-
 // WithLevel returns a new context with the specified level
 func (c *metricsContext) WithLevel(level Level) Context {
 	return &metricsContext{
 		level: level,
-		mask:  c.mask,
 	}
-}
-
-// WithMask returns a new context with the specified mask
-func (c *metricsContext) WithMask(mask Mask) Context {
-	return &metricsContext{
-		level: c.level,
-		mask:  mask,
-	}
-}
-
-// manager implements the [Manager] interface
-type manager struct {
-	mu          sync.RWMutex
-	groups      map[string]*group
-	globalLevel Level
-	globalMask  Mask
-	backend     Backend
-}
-
-// NewManager creates a new metrics manager with the specified [Backend]
-func NewManager(backend Backend) Manager {
-	return &manager{
-		groups:      make(map[string]*group),
-		globalLevel: LevelImportant, // Safe default
-		globalMask:  MaskProduction, // Safe default
-		backend:     backend,
-	}
-}
-
-// Group returns or creates a metric [Group]
-func (m *manager) Group(name string) Group {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if group, exists := m.groups[name]; exists {
-		return group
-	}
-
-	group := &group{
-		name:    name,
-		level:   m.globalLevel,
-		mask:    m.globalMask,
-		backend: m.backend,
-	}
-	m.groups[name] = group
-	return group
-}
-
-// SetGlobalLevel sets the global metrics level
-func (m *manager) SetGlobalLevel(level Level) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.globalLevel = level
-	// Update all existing groups
-	for _, group := range m.groups {
-		group.SetGroupLevel(level)
-	}
-}
-
-// SetGlobalMask sets the global metrics mask
-func (m *manager) SetGlobalMask(mask Mask) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.globalMask = mask
-	// Update all existing groups
-	for _, group := range m.groups {
-		group.SetGroupMask(mask)
-	}
-}
-
-// GlobalContext returns the global metrics context
-func (m *manager) GlobalContext() Context {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	return NewContext(m.globalLevel, m.globalMask)
-}
-
-// group implements the Group interface
-type group struct {
-	mu      sync.RWMutex
-	name    string
-	level   Level
-	mask    Mask
-	backend Backend
-	factory Factory
-}
-
-// Factory returns a factory for creating metrics in this group
-func (g *group) Factory() Factory {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-
-	if g.factory == nil {
-		g.factory = newFactory(g.backend, g.name, g.level, g.mask)
-	}
-	return g.factory
-}
-
-// SetGroupLevel sets the level for this group
-func (g *group) SetGroupLevel(level Level) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	g.level = level
-	// Invalidate factory so it gets recreated with new level
-}
-
-// SetGroupMask sets the mask for this group
-func (g *group) SetGroupMask(mask Mask) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	g.mask = mask
-	// Invalidate factory so it gets recreated with new mask
-	g.factory = nil
-}
-
-// Context returns a context for this group
-func (g *group) Context() Context {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-
-	return NewContext(g.level, g.mask)
 }

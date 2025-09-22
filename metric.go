@@ -2,112 +2,46 @@ package umami
 
 import "time"
 
-// Context allows checking if metrics are enabled without coupling to specific implementations
-//
-// Each [Group] typically has its own Context, but they may be shared
-type Context interface {
-	// Enabled returns true if metrics at this level should be processed
-	Enabled(level Level) bool
-
-	// EnabledMask returns true if metrics with this mask should be processed
-	EnabledMask(mask Mask) bool
-
-	// WithLevel returns a new context with the specified level
-	WithLevel(level Level) Context
-
-	// WithMask returns a new context with the specified mask
-	WithMask(mask Mask) Context
+// Metric is the base interface for all metrics
+type Metric interface {
+	SetLevel(level Level)
+	Name() string
+	Help() string
+	Type() MetricType
+	Level() Level
 }
 
-// Factory creates metrics with the appropriate [Level] and [Mask]
-type Factory interface {
-	// Counter creates a counter with the given level and mask
-	Counter(opts CounterOpts, level Level, mask Mask) Counter
-
-	// CounterVec creates a label-vectorized counter with the given level and mask
-	CounterVec(opts CounterVecOpts, level Level, mask Mask) CounterVec
-
-	// Gauge creates a gauge with the given level and mask
-	Gauge(opts GaugeOpts, level Level, mask Mask) Gauge
-
-	// GaugeVec creates a label-vectorized gauge with the given level and mask
-	GaugeVec(opts GaugeVecOpts, level Level, mask Mask) GaugeVec
-
-	// Histogram creates a histogram with the given level and mask
-	Histogram(opts HistogramOpts, level Level, mask Mask) Histogram
-
-	// HistogramVec creates a label-vectorized histogram with the given level and mask
-	HistogramVec(opts HistogramVecOpts, level Level, mask Mask) HistogramVec
-
-	// Summary creates a summary with the given level and mask
-	Summary(opts SummaryOpts, level Level, mask Mask) Summary
-
-	// SummaryVec creates a label-vectorized summary with the given level and mask
-	SummaryVec(opts SummaryVecOpts, level Level, mask Mask) SummaryVec
-
-	// Timer creates a timer with the given level and mask
-	Timer(opts TimerOpts, level Level, mask Mask) Timer
-
-	// TimerVec creates a label-vectorized timer with the given level and mask
-	TimerVec(opts TimerVecOpts, level Level, mask Mask) TimerVec
-
-	// Cache creates cache metrics with the given level and mask
-	Cache(opts CacheOpts, level Level, mask Mask) Cache
-
-	// CacheVec creates a label-vectorized cache with the given level and mask
-	CacheVec(opts CacheVecOpts, level Level, mask Mask) CacheVec
-
-	// Pool creates pool metrics with the given level and mask
-	Pool(opts PoolOpts, level Level, mask Mask) Pool
-
-	// PoolVec creates a label-vectorized pool with the given level and mask
-	PoolVec(opts PoolVecOpts, level Level, mask Mask) PoolVec
-
-	// CircuitBreaker creates circuit breaker metrics with the given level and mask
-	CircuitBreaker(opts CircuitBreakerOpts, level Level, mask Mask) CircuitBreaker
-
-	// CircuitBreakerVec creates a label-vectorized circuit breaker with the given level and mask
-	CircuitBreakerVec(opts CircuitBreakerVecOpts, level Level, mask Mask) CircuitBreakerVec
-
-	// Queue creates queue metrics with the given level and mask
-	Queue(opts QueueOpts, level Level, mask Mask) Queue
-
-	// QueueVec creates a label-vectorized queue with the given level and mask
-	QueueVec(opts QueueVecOpts, level Level, mask Mask) QueueVec
+type CompositeMetric interface {
+	Metric
+	Components() []Metric
 }
 
-// Group represents a logical grouping of metrics (e.g., "web", "database", "pipeline")
-type Group interface {
-	// Factory returns a factory for creating metrics in this group
-	Factory() Factory
-
-	// SetGroupLevel sets the level for this group
-	SetGroupLevel(level Level)
-
-	// SetGroupMask sets the mask for this group
-	SetGroupMask(mask Mask)
-
-	// Context returns a context for this group
-	Context() Context
+type NoopMetric interface {
+	Metric
+	constructorOpts() any
 }
 
-// Manager is the top-level metrics manager
-type Manager interface {
-	// Group returns or creates a metric group
-	Group(name string) Group
+// VecLabels is a type that represents a set partition keys to values
+type VecLabels map[string]string
 
-	// SetGlobalLevel sets the global metrics level
-	SetGlobalLevel(level Level)
+type BasicMetricOpts struct {
+	FromComposite bool
+}
 
-	// SetGlobalMask sets the global metrics mask
-	SetGlobalMask(mask Mask)
+type MetricInfo struct {
+	Name string
+	Help string
+}
 
-	// GlobalContext returns the global metrics context
-	GlobalContext() Context
+type CounterOpts struct {
+	BasicMetricOpts
+	MetricInfo
 }
 
 // Counter is a metric that counts occurrences. It only counts up.
 type Counter interface {
+	Metric
+
 	// Inc increments the counter. Noop if disabled.
 	Inc(ctx Context) error
 
@@ -115,8 +49,16 @@ type Counter interface {
 	Add(ctx Context, value float64) error
 }
 
+type CounterVecOpts struct {
+	BasicMetricOpts
+	MetricInfo
+	Labels []string
+}
+
 // CounterVec is a metric that counts occurrences, partitioned by labels.
 type CounterVec interface {
+	Metric
+
 	// Inc increments the counter for the given labels. Noop if disabled.
 	Inc(ctx Context, labels VecLabels) error
 
@@ -124,8 +66,15 @@ type CounterVec interface {
 	Add(ctx Context, value float64, labels VecLabels) error
 }
 
+type GaugeOpts struct {
+	BasicMetricOpts
+	MetricInfo
+}
+
 // Gauge is a metric that represents a single numerical value that can arbitrarily go up and down.
 type Gauge interface {
+	Metric
+
 	// Set sets the gauge to the given value. Noop if disabled.
 	Set(ctx Context, value float64) error
 
@@ -139,8 +88,16 @@ type Gauge interface {
 	Add(ctx Context, value float64) error
 }
 
+type GaugeVecOpts struct {
+	BasicMetricOpts
+	MetricInfo
+	Labels []string
+}
+
 // GaugeVec is a metric that represents a collection of gauge values, partitioned by labels.
 type GaugeVec interface {
+	Metric
+
 	// Set sets the gauge for the given labels to the given value. Noop if disabled.
 	Set(ctx Context, value float64, labels VecLabels) error
 
@@ -154,26 +111,45 @@ type GaugeVec interface {
 	Add(ctx Context, value float64, labels VecLabels) error
 }
 
+type HistogramOpts struct {
+	BasicMetricOpts
+	MetricInfo
+	Buckets []float64
+}
+
 // Histogram is a metric that represents a distribution of values.
 type Histogram interface {
+	Metric
+
 	// Observe adds an observation to the histogram. Noop if disabled.
 	Observe(ctx Context, value float64) error
+}
 
-	// Time times the execution of the function. Noop if disabled.
-	Time(ctx Context, fn func() error) error
+type HistogramVecOpts struct {
+	BasicMetricOpts
+	MetricInfo
+	Labels  []string
+	Buckets []float64
 }
 
 // HistogramVec is a metric that represents a distribution of values, partitioned by labels.
 type HistogramVec interface {
+	Metric
+
 	// Observe adds an observation to the histogram for the given labels. Noop if disabled.
 	Observe(ctx Context, value float64, labels VecLabels) error
+}
 
-	// Time times the execution of the function for the given labels. Noop if disabled.
-	Time(ctx Context, fn func() error, labels VecLabels) error
+type SummaryOpts struct {
+	BasicMetricOpts
+	MetricInfo
+	Objectives map[float64]float64
 }
 
 // Summary is a metric that provides quantiles of a distribution.
 type Summary interface {
+	Metric
+
 	// Observe adds an observation to the summary. Noop if disabled.
 	Observe(ctx Context, value float64) error
 
@@ -181,8 +157,17 @@ type Summary interface {
 	Quantile(ctx Context, q float64) (float64, error)
 }
 
+type SummaryVecOpts struct {
+	BasicMetricOpts
+	MetricInfo
+	Labels     []string
+	Objectives map[float64]float64
+}
+
 // SummaryVec is a metric that provides quantiles of a distribution, partitioned by labels.
 type SummaryVec interface {
+	Metric
+
 	// Observe adds an observation to the summary for the given labels. Noop if disabled.
 	Observe(ctx Context, value float64, labels VecLabels) error
 
@@ -190,8 +175,15 @@ type SummaryVec interface {
 	Quantile(ctx Context, q float64, labels VecLabels) (float64, error)
 }
 
+type TimerOpts struct {
+	MetricInfo
+	HistogramOpts HistogramOpts
+}
+
 // Timer is a metric that measures durations.
 type Timer interface {
+	CompositeMetric
+
 	// Start returns a function that should be called when the operation completes
 	// Returns a no-op function if metric is disabled
 	Start(ctx Context) func()
@@ -200,8 +192,15 @@ type Timer interface {
 	Record(ctx Context, duration time.Duration) error
 }
 
+type TimerVecOpts struct {
+	MetricInfo
+	HistogramVecOpts HistogramVecOpts
+}
+
 // TimerVec is a metric that measures durations, partitioned by labels.
 type TimerVec interface {
+	CompositeMetric
+
 	// Start returns a function that should be called when the operation completes
 	// Returns a no-op function if metric is disabled
 	Start(ctx Context, labels VecLabels) func()
@@ -210,8 +209,17 @@ type TimerVec interface {
 	Record(ctx Context, duration time.Duration, labels VecLabels) error
 }
 
+type CacheOpts struct {
+	MetricInfo
+	HitOpts  CounterOpts
+	MissOpts CounterOpts
+	SizeOpts GaugeOpts
+}
+
 // Cache is a metric that represents cache performance.
 type Cache interface {
+	CompositeMetric
+
 	// Hit records a cache hit. Noop if disabled.
 	Hit(ctx Context) error
 
@@ -222,8 +230,17 @@ type Cache interface {
 	SetSize(ctx Context, bytes int64) error
 }
 
+type CacheVecOpts struct {
+	MetricInfo
+	HitVecOpts  CounterVecOpts
+	MissVecOpts CounterVecOpts
+	SizeVecOpts GaugeVecOpts
+}
+
 // CacheVec is a metric that represents cache performance, partitioned by labels.
 type CacheVec interface {
+	CompositeMetric
+
 	// Hit records a cache hit for the given labels. Noop if disabled.
 	Hit(ctx Context, labels VecLabels) error
 
@@ -234,8 +251,18 @@ type CacheVec interface {
 	SetSize(ctx Context, bytes int64, labels VecLabels) error
 }
 
+type PoolOpts struct {
+	MetricInfo
+	ActiveOpts   GaugeOpts
+	IdleOpts     GaugeOpts
+	AcquiredOpts CounterOpts
+	ReleasedOpts CounterOpts
+}
+
 // Pool is a metric that represents item pool utilization.
 type Pool interface {
+	CompositeMetric
+
 	// SetActive sets the number of active items. Noop if disabled.
 	SetActive(ctx Context, count int) error
 
@@ -249,8 +276,18 @@ type Pool interface {
 	Released(ctx Context) error
 }
 
+type PoolVecOpts struct {
+	MetricInfo
+	ActiveVecOpts   GaugeVecOpts
+	IdleVecOpts     GaugeVecOpts
+	AcquiredVecOpts CounterVecOpts
+	ReleasedVecOpts CounterVecOpts
+}
+
 // PoolVec is a metric that represents item pool utilization, partitioned by labels.
 type PoolVec interface {
+	CompositeMetric
+
 	// SetActive sets the number of active items for the given labels. Noop if disabled.
 	SetActive(ctx Context, count int, labels VecLabels) error
 
@@ -264,8 +301,17 @@ type PoolVec interface {
 	Released(ctx Context, labels VecLabels) error
 }
 
+type CircuitBreakerOpts struct {
+	MetricInfo
+	StateOpts   GaugeOpts
+	SuccessOpts CounterOpts
+	FailureOpts CounterOpts
+}
+
 // CircuitBreaker is a metric that represents the circuit breaker state
 type CircuitBreaker interface {
+	CompositeMetric
+
 	// SetState sets the circuit breaker state. Noop if disabled.
 	SetState(ctx Context, state CircuitBreakerState) error
 
@@ -276,8 +322,17 @@ type CircuitBreaker interface {
 	Failure(ctx Context) error
 }
 
+type CircuitBreakerVecOpts struct {
+	MetricInfo
+	StateVecOpts   GaugeVecOpts
+	SuccessVecOpts CounterVecOpts
+	FailureVecOpts CounterVecOpts
+}
+
 // CircuitBreakerVec is a metric that represents the circuit breaker state, partitioned by labels.
 type CircuitBreakerVec interface {
+	CompositeMetric
+
 	// SetState sets the circuit breaker state for the given labels. Noop if disabled.
 	SetState(ctx Context, state CircuitBreakerState, labels VecLabels) error
 
@@ -288,8 +343,18 @@ type CircuitBreakerVec interface {
 	Failure(ctx Context, labels VecLabels) error
 }
 
+type QueueOpts struct {
+	MetricInfo
+	DepthOpts    GaugeOpts
+	EnqueuedOpts CounterOpts
+	DequeuedOpts CounterOpts
+	WaitTimeOpts HistogramOpts
+}
+
 // Queue is a metric that represents queue statistics.
 type Queue interface {
+	CompositeMetric
+
 	// SetDepth sets the current queue depth. Noop if disabled.
 	SetDepth(ctx Context, depth int) error
 
@@ -303,8 +368,18 @@ type Queue interface {
 	SetWaitTime(ctx Context, duration time.Duration) error
 }
 
+type QueueVecOpts struct {
+	MetricInfo
+	DepthVecOpts    GaugeVecOpts
+	EnqueuedVecOpts CounterVecOpts
+	DequeuedVecOpts CounterVecOpts
+	WaitTimeVecOpts HistogramVecOpts
+}
+
 // QueueVec is a metric that represents queue statistics, partitioned by labels.
 type QueueVec interface {
+	CompositeMetric
+
 	// SetDepth sets the current queue depth for the given labels. Noop if disabled.
 	SetDepth(ctx Context, depth int, labels VecLabels) error
 

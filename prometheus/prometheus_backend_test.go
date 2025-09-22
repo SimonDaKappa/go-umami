@@ -12,12 +12,12 @@ import (
 func TestManagerIntegrationWithPrometheusBackend(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	backend := NewPrometheusBackend(reg)
-	manager := umami.NewManager(backend)
+	manager := umami.NewRegistry(backend)
 	group := manager.Group("web")
 	factory := group.Factory()
 
-	counter := factory.Counter(umami.CounterOpts{Name: "integration_counter", Help: "integration counter"}, 0, 0)
-	ctx := umami.NewContext(0, 0)
+	counter := factory.Counter(umami.CounterOpts{Name: "integration_counter", Help: "integration counter"}, 0)
+	ctx := umami.NewContext(0)
 	if err := counter.Inc(ctx); err != nil {
 		t.Errorf("Manager integration Counter Inc failed: %v", err)
 	}
@@ -25,7 +25,7 @@ func TestManagerIntegrationWithPrometheusBackend(t *testing.T) {
 		t.Errorf("Manager integration Counter Add failed: %v", err)
 	}
 
-	gauge := factory.Gauge(umami.GaugeOpts{Name: "integration_gauge", Help: "integration gauge"}, 0, 0)
+	gauge := factory.Gauge(umami.GaugeOpts{Name: "integration_gauge", Help: "integration gauge"}, 0)
 	if err := gauge.Set(ctx, 10); err != nil {
 		t.Errorf("Manager integration Gauge Set failed: %v", err)
 	}
@@ -39,12 +39,12 @@ func TestManagerIntegrationWithPrometheusBackend(t *testing.T) {
 		t.Errorf("Manager integration Gauge Add failed: %v", err)
 	}
 
-	hist := factory.Histogram(umami.HistogramOpts{Name: "integration_histogram", Help: "integration histogram", Buckets: []float64{0.1, 1, 10}}, 0, 0)
+	hist := factory.Histogram(umami.HistogramOpts{Name: "integration_histogram", Help: "integration histogram", Buckets: []float64{0.1, 1, 10}}, 0)
 	if err := hist.Observe(ctx, 0.7); err != nil {
 		t.Errorf("Manager integration Histogram Observe failed: %v", err)
 	}
 
-	summary := factory.Summary(umami.SummaryOpts{Name: "integration_summary", Help: "integration summary", Objectives: map[float64]float64{0.5: 0.05}}, 0, 0)
+	summary := factory.Summary(umami.SummaryOpts{Name: "integration_summary", Help: "integration summary", Objectives: map[float64]float64{0.5: 0.05}}, 0)
 	if err := summary.Observe(ctx, 1.5); err != nil {
 		t.Errorf("Manager integration Summary Observe failed: %v", err)
 	}

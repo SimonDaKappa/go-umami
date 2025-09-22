@@ -10,7 +10,6 @@ import (
 type Config struct {
 	// Global settings
 	GlobalLevel Level `json:"global_level" yaml:"global_level"`
-	GlobalMask  Mask  `json:"global_mask" yaml:"global_mask"`
 
 	// Per-group settings
 	Groups map[string]GroupConfig `json:"groups" yaml:"groups"`
@@ -21,13 +20,15 @@ type Config struct {
 
 // GroupConfig represents configuration for a specific metric group
 type GroupConfig struct {
+	// Minimum level for this group
 	Level Level `json:"level" yaml:"level"`
-	Mask  Mask  `json:"mask" yaml:"mask"`
+	// Level options for this group
+	LevelOpts LevelOpts `json:"level_opts" yaml:"level_opts"`
 }
 
 // BackendConfig represents backend-specific configuration
 type BackendConfig struct {
-	Type   string         `json:"type" yaml:"type"`     // "prometheus", "datadog", "statsd", etc.
+	Name   string         `json:"name" yaml:"name"`     // "prometheus", "datadog", "opentelemetry", etc.
 	Config map[string]any `json:"config" yaml:"config"` // Backend-specific configuration
 }
 
@@ -35,10 +36,9 @@ type BackendConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		GlobalLevel: LevelImportant,
-		GlobalMask:  MaskProduction,
 		Groups:      make(map[string]GroupConfig),
 		Backend: BackendConfig{
-			Type:   BackendNoneName,
+			Name:   BackendNoneName,
 			Config: make(map[string]any),
 		},
 	}
@@ -48,7 +48,6 @@ func DefaultConfig() *Config {
 func ProductionConfig(backend Backend) *Config {
 	config := DefaultConfig()
 	config.GlobalLevel = LevelImportant
-	config.GlobalMask = MaskProduction
 
 	// Disable debug metrics in production
 	for name, group := range config.Groups {
@@ -58,7 +57,7 @@ func ProductionConfig(backend Backend) *Config {
 		config.Groups[name] = group
 	}
 
-	config.Backend.Type = backend.Name()
+	config.Backend.Name = backend.Name()
 
 	return config
 }
@@ -67,16 +66,14 @@ func ProductionConfig(backend Backend) *Config {
 func DevelopmentConfig(backend Backend) *Config {
 	config := DefaultConfig()
 	config.GlobalLevel = LevelVerbose
-	config.GlobalMask = MaskAll
 
 	// Enable detailed metrics in development
 	for name, group := range config.Groups {
 		group.Level = LevelVerbose
-		group.Mask = MaskAll
 		config.Groups[name] = group
 	}
 
-	config.Backend.Type = backend.Name()
+	config.Backend.Name = backend.Name()
 
 	return config
 }
@@ -113,19 +110,13 @@ func LoadConfigFromEnv() *Config {
 		config.GlobalLevel = ParseLevel(levelStr)
 	}
 
-	// Global mask
-	if maskStr := os.Getenv(EnvMetricsMaskKey); maskStr != "" {
-		config.GlobalMask = ParseMask(maskStr)
-	}
-
 	// Backend type
 	if backendType := os.Getenv(EnvMetricsBackendKey); backendType != "" {
-		config.Backend.Type = backendType
+		config.Backend.Name = backendType
 	}
 
 	// Group-specific overrides
 	// Format: METRICS_GROUP_<NAME>_LEVEL=<level>
-	// Format: METRICS_GROUP_<NAME>_MASK=<mask>
 	for _, env := range os.Environ() {
 		if strings.HasPrefix(env, EnvMetricsGroupPrefix) {
 			parts := strings.SplitN(env, "=", 2)
@@ -149,8 +140,6 @@ func LoadConfigFromEnv() *Config {
 			switch setting {
 			case "level":
 				groupConfig.Level = ParseLevel(value)
-			case "mask":
-				groupConfig.Mask = ParseMask(value)
 			}
 
 			config.Groups[groupName] = groupConfig
@@ -160,79 +149,19 @@ func LoadConfigFromEnv() *Config {
 	return config
 }
 
-// ParseMask parses a mask string into a [Mask]
-func ParseMask(s string) Mask {
-	if s == "" {
-		return MaskProduction
+// ApplyConfig applies the configuration to a metrics [Registry]
+func ApplyConfig(manager Registry, config *Config) {
+	globalLevelOpts := LevelOpts{
+		ReplaceNoops: false,
 	}
 
-	switch strings.ToUpper(s) {
-	case MaskNoneStr:
-		return MaskNone
-	case MaskEssentialStr:
-		return MaskEssential
-	case MaskProductionStr:
-		return MaskProduction
-	case MaskAllStr:
-		return MaskAll
-	}
-
-	// Parse individual flags separated by |
-	var mask Mask
-	flags := strings.Split(strings.ToUpper(s), "|")
-
-	for _, flag := range flags {
-		flag = strings.TrimSpace(flag)
-		switch flag {
-		case MaskCountersStr:
-			mask = mask.Add(MaskCounters)
-		case MaskLatencyStr:
-			mask = mask.Add(MaskLatency)
-		case MaskThroughputStr:
-			mask = mask.Add(MaskThroughput)
-		case MaskErrorsStr:
-			mask = mask.Add(MaskErrors)
-		case MaskResourcesStr:
-			mask = mask.Add(MaskResources)
-		case MaskQueuesStr:
-			mask = mask.Add(MaskQueues)
-		case MaskConnectionsStr:
-			mask = mask.Add(MaskConnections)
-		case MaskCacheStr:
-			mask = mask.Add(MaskCache)
-		case MaskCircuitBreakerStr:
-			mask = mask.Add(MaskCircuitBreaker)
-		case MaskHealthStr:
-			mask = mask.Add(MaskHealth)
-		case MaskSecurityStr:
-			mask = mask.Add(MaskSecurity)
-		case MaskPerformanceStr:
-			mask = mask.Add(MaskPerformance)
-		case MaskInternalStr:
-			mask = mask.Add(MaskInternal)
-		case MaskPerUserStr:
-			mask = mask.Add(MaskPerUser)
-		case MaskPerRequestStr:
-			mask = mask.Add(MaskPerRequest)
-		case MaskDetailedStr:
-			mask = mask.Add(MaskDetailed)
-		}
-	}
-
-	return mask
-}
-
-// ApplyConfig applies the configuration to a metrics [Manager]
-func ApplyConfig(manager Manager, config *Config) {
 	// Apply global settings
-	manager.SetGlobalLevel(config.GlobalLevel)
-	manager.SetGlobalMask(config.GlobalMask)
+	manager.SetGlobalLevel(config.GlobalLevel, globalLevelOpts)
 
 	// Apply group-specific settings
 	for name, groupConfig := range config.Groups {
 		group := manager.Group(name)
-		group.SetGroupLevel(groupConfig.Level)
-		group.SetGroupMask(groupConfig.Mask)
+		group.SetGroupLevel(groupConfig.Level, groupConfig.LevelOpts)
 	}
 }
 

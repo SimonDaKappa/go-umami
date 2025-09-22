@@ -24,7 +24,7 @@ func NewPrometheusBackend(reg *prometheus.Registry) umami.Backend {
 	}
 }
 
-func (p *prometheusBackend) Counter(opts umami.CounterOpts) umami.CounterBackend {
+func (p *prometheusBackend) Counter(opts umami.CounterOpts) umami.CounterAdapter {
 	counter := prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Name: opts.Name,
@@ -32,10 +32,10 @@ func (p *prometheusBackend) Counter(opts umami.CounterOpts) umami.CounterBackend
 		},
 	)
 	p.registry.MustRegister(counter)
-	return &prometheusCounterBackend{counter: counter}
+	return &prCounterAdapter{internal: counter}
 }
 
-func (p *prometheusBackend) CounterVec(opts umami.CounterVecOpts) umami.CounterVecBackend {
+func (p *prometheusBackend) CounterVec(opts umami.CounterVecOpts) umami.CounterVecAdapter {
 	counterVec := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: opts.Name,
@@ -44,10 +44,10 @@ func (p *prometheusBackend) CounterVec(opts umami.CounterVecOpts) umami.CounterV
 		opts.Labels,
 	)
 	p.registry.MustRegister(counterVec)
-	return &prometheusCounterVecBackend{counterVec: counterVec}
+	return &prCounterVecAdapter{internal: counterVec}
 }
 
-func (p *prometheusBackend) Gauge(opts umami.GaugeOpts) umami.GaugeBackend {
+func (p *prometheusBackend) Gauge(opts umami.GaugeOpts) umami.GaugeAdapter {
 	gauge := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Name: opts.Name,
@@ -55,10 +55,10 @@ func (p *prometheusBackend) Gauge(opts umami.GaugeOpts) umami.GaugeBackend {
 		},
 	)
 	p.registry.MustRegister(gauge)
-	return &prometheusGaugeBackend{gauge: gauge}
+	return &prGaugeAdapter{internal: gauge}
 }
 
-func (p *prometheusBackend) GaugeVec(opts umami.GaugeVecOpts) umami.GaugeVecBackend {
+func (p *prometheusBackend) GaugeVec(opts umami.GaugeVecOpts) umami.GaugeVecAdapter {
 	gaugeVec := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: opts.Name,
@@ -67,10 +67,10 @@ func (p *prometheusBackend) GaugeVec(opts umami.GaugeVecOpts) umami.GaugeVecBack
 		opts.Labels,
 	)
 	p.registry.MustRegister(gaugeVec)
-	return &prometheusGaugeVecBackend{gaugeVec: gaugeVec}
+	return &prGaugeVecAdapter{internal: gaugeVec}
 }
 
-func (p *prometheusBackend) Histogram(opts umami.HistogramOpts) umami.HistogramBackend {
+func (p *prometheusBackend) Histogram(opts umami.HistogramOpts) umami.HistogramAdapter {
 	histogram := prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Name:    opts.Name,
@@ -79,10 +79,10 @@ func (p *prometheusBackend) Histogram(opts umami.HistogramOpts) umami.HistogramB
 		},
 	)
 	p.registry.MustRegister(histogram)
-	return &prometheusHistogramBackend{histogram: histogram}
+	return &prHistogramAdapter{internal: histogram}
 }
 
-func (p *prometheusBackend) HistogramVec(opts umami.HistogramVecOpts) umami.HistogramVecBackend {
+func (p *prometheusBackend) HistogramVec(opts umami.HistogramVecOpts) umami.HistogramVecAdapter {
 	histogramVec := prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    opts.Name,
@@ -92,10 +92,10 @@ func (p *prometheusBackend) HistogramVec(opts umami.HistogramVecOpts) umami.Hist
 		opts.Labels,
 	)
 	p.registry.MustRegister(histogramVec)
-	return &prometheusHistogramVecBackend{histogramVec: histogramVec}
+	return &prHistogramVecAdapter{internal: histogramVec}
 }
 
-func (p *prometheusBackend) Summary(opts umami.SummaryOpts) umami.SummaryBackend {
+func (p *prometheusBackend) Summary(opts umami.SummaryOpts) umami.SummaryAdapter {
 	summary := prometheus.NewSummary(
 		prometheus.SummaryOpts{
 			Name:       opts.Name,
@@ -104,10 +104,10 @@ func (p *prometheusBackend) Summary(opts umami.SummaryOpts) umami.SummaryBackend
 		},
 	)
 	p.registry.MustRegister(summary)
-	return &prometheusSummaryBackend{summary: summary}
+	return &prSummaryAdapter{internal: summary}
 }
 
-func (p *prometheusBackend) SummaryVec(opts umami.SummaryVecOpts) umami.SummaryVecBackend {
+func (p *prometheusBackend) SummaryVec(opts umami.SummaryVecOpts) umami.SummaryVecAdapater {
 	summaryVec := prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Name:       opts.Name,
@@ -117,11 +117,11 @@ func (p *prometheusBackend) SummaryVec(opts umami.SummaryVecOpts) umami.SummaryV
 		opts.Labels,
 	)
 	p.registry.MustRegister(summaryVec)
-	return &prometheusSummaryVecBackend{summaryVec: summaryVec}
+	return &prSummaryVecAdapter{internal: summaryVec}
 }
 
 func (p *prometheusBackend) Name() string {
 	return PrometheusBackendName
 }
 
-var _prometheusBackend umami.Backend = (*prometheusBackend)(nil)
+var __ctc_prometheusBackend umami.Backend = (*prometheusBackend)(nil)
